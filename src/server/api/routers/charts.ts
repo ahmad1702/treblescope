@@ -15,21 +15,81 @@ export type BillboardChartDatum = {
   weeksOnBoard: number;
 };
 export const chartsRouter = createTRPCRouter({
-  getBillboardsChartsData: publicProcedure
+  getTopBillboardsChartsData: publicProcedure
     .input(
-      z.object({
-        startIndex: z.number().int().positive().optional(),
-        endIndex: z.number().int().positive().optional(),
-      }).optional()
+      z
+        .object({
+          startIndex: z.number().int().positive().optional(),
+          endIndex: z.number().int().positive().optional(),
+        })
+        .optional()
     )
     .query(async ({ input }) => {
-      let startIndex = 2
-      let endIndex = 100
+      let startIndex = 2;
+      let endIndex = 100;
       if (input && input.startIndex !== undefined) {
-        startIndex = input.startIndex
+        startIndex = input.startIndex;
       }
       if (input && input.endIndex !== undefined) {
-        endIndex = input.endIndex
+        endIndex = input.endIndex;
+      }
+      const csvDirectory = path.join(process.cwd(), "src/data");
+      const fileContent = await fs.readFile(
+        csvDirectory + "/filtered.csv",
+        "utf8"
+      );
+      const headers = [
+        "date",
+        "rank",
+        "song",
+        "artist",
+        "lastWeek",
+        "peakRank",
+        "weeksOnBoard",
+      ];
+      const numberColumns = ["rank", "lastWeek", "peakRank", "weeksOnBoard"];
+      try {
+        const res: BillboardChartDatum[] = parse(fileContent, {
+          delimiter: ",",
+          columns: headers,
+          from: startIndex,
+          to: endIndex,
+          cast: (columnValue, context) => {
+            if (context.column === "date" && typeof columnValue === "string") {
+              return new Date(columnValue);
+            } else if (
+              typeof context.column === "string" &&
+              numberColumns.includes(context.column)
+            ) {
+              const parsedValue = parseInt(columnValue);
+              return !isNaN(parsedValue) ? parsedValue : null;
+            }
+            return columnValue;
+          },
+        }) as unknown as BillboardChartDatum[];
+        res.reverse()
+        return res
+      } catch (error) {
+        return [];
+      }
+    }),
+  getBillboardsChartsData: publicProcedure
+    .input(
+      z
+        .object({
+          startIndex: z.number().int().positive().optional(),
+          endIndex: z.number().int().positive().optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      let startIndex = 2;
+      let endIndex = 100;
+      if (input && input.startIndex !== undefined) {
+        startIndex = input.startIndex;
+      }
+      if (input && input.endIndex !== undefined) {
+        endIndex = input.endIndex;
       }
       const csvDirectory = path.join(process.cwd(), "src/data");
       const fileContent = await fs.readFile(
